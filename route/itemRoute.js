@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const validateItem = require('../middleware/itemValidator')
+const validateItem = require('../middleware/itemValidator'); // Import correctly
 const itemController = require('../controller/itemController');
 
 router.post('/items', validateItem, itemController.createItem);

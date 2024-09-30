@@ -1,55 +1,84 @@
 const Item = require('../model/item');
+const { validationResult } = require('express-validator');
+const createError = require('http-errors');
 
 // Create a new item
-exports.createItem = async (req, res) => {
+exports.createItem = async (req, res, next) => {
     try {
+        // Validate request body
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return next(createError(400, { errors: errors.array() }));
+        }
+
         const newItem = new Item(req.body);
         await newItem.save();
         res.status(201).json(newItem);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        next(createError(500, error.message));
     }
 };
 
-// Read all items
-exports.getItems = async (req, res) => {
+// Read all items with pagination
+exports.getItems = async (req, res, next) => {
     try {
-        const items = await Item.find();
-        res.status(200).json(items);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const items = await Item.find().skip(skip).limit(limit);
+        const totalItems = await Item.countDocuments();
+
+        res.status(200).json({
+            items,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / limit),
+                currentPage: page
+            }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(createError(500, error.message));
     }
 };
 
 // Read a single item
-exports.getItem = async (req, res) => {
+exports.getItem = async (req, res, next) => {
     try {
         const item = await Item.findById(req.params.id);
-        if (!item) return res.status(404).json({ message: 'Item not found' });
+        if (!item) return next(createError(404, 'Item not found'));
+
         res.status(200).json(item);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(createError(500, error.message));
     }
 };
 
 // Update an item
-exports.updateItem = async (req, res) => {
+exports.updateItem = async (req, res, next) => {
     try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return next(createError(400, { errors: errors.array() }));
+        }
+
         const updatedItem = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedItem) return res.status(404).json({ message: 'Item not found' });
+        if (!updatedItem) return next(createError(404, 'Item not found'));
+
         res.status(200).json(updatedItem);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        next(createError(400, error.message));
     }
 };
 
 // Delete an item
-exports.deleteItem = async (req, res) => {
+exports.deleteItem = async (req, res, next) => {
     try {
         const deletedItem = await Item.findByIdAndDelete(req.params.id);
-        if (!deletedItem) return res.status(404).json({ message: 'Item not found' });
-        res.status(200).json({ message: 'Item deleted' });
+        if (!deletedItem) return next(createError(404, 'Item not found'));
+
+        res.status(200).json({ message: 'Item deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(createError(500, error.message));
     }
 };
